@@ -1,0 +1,15 @@
+# Python Backend
+crop_backend/__pycache__/
+crop_backend/crop_disease_model.keras
+crop_backend/labels.json
+*.pyc
+
+# Flutter
+crop_disease_detection_pp/build/
+.dart_tool/
+.packages
+.flutter-plugins
+.flutter-plugins-dependencies
+*.lock
+.idea/
+.vscode/
