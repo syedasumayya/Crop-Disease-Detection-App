@@ -1,10 +1,10 @@
-import 'dart:convert';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../theme.dart';
+import 'upload_screen.dart';
 import 'history_screen.dart';
+import 'tips_screen.dart';
+import 'profile_screen.dart';
+import '../utils/auth_store.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -14,287 +14,327 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  Uint8List? _imageBytes;
-  final ImagePicker _picker = ImagePicker();
-  bool _isLoading = false;
-  String _username = 'Farmer';
-  String _recentDisease = 'No scans yet';
-  String _recentConfidence = '';
-  int _selectedIndex = 0;
+  int _navIndex = 0;
+  String _name = '';
 
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    _loadName();
   }
 
-  Future<void> _loadUserData() async {
-    final prefs = await SharedPreferences.getInstance();
-    String email = prefs.getString('user_email') ?? 'Farmer';
-    // Extract name from email (e.g., syeda@gmail.com -> Syeda)
-    String name = email.split('@')[0];
-    name = name[0].toUpperCase() + name.substring(1);
-
-    List<String> history = prefs.getStringList('scan_history') ?? [];
-    if (history.isNotEmpty) {
-      var parts = history.first.split('|');
-      setState(() {
-        _recentDisease = parts[1];
-        _recentConfidence = parts[2];
-      });
-    }
-
-    setState(() {
-      _username = name;
-    });
+  Future<void> _loadName() async {
+    final name = await AuthStore.currentUserName();
+    if (mounted && name != null) setState(() => _name = name);
   }
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('user_email');
-    Navigator.pushReplacementNamed(context, '/');
+  void _pickImage() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const UploadScreen()));
   }
 
-  Future<void> _pickImage() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final XFile? image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        final bytes = await image.readAsBytes();
-        setState(() => _imageBytes = bytes);
-
-        var request = http.MultipartRequest('POST', Uri.parse('http://127.0.0.1:8000/predict'));
-        request.files.add(http.MultipartFile.fromBytes('file', bytes, filename: 'leaf.jpg'));
-        var response = await request.send();
-
-        if (response.statusCode == 200) {
-          var data = json.decode(await response.stream.bytesToString());
-          String disease = data['disease'];
-          double confidence = data['confidence'];
-
-          final prefs = await SharedPreferences.getInstance();
-          List<String> history = prefs.getStringList('scan_history') ?? [];
-          String record = '${DateTime.now().toString().substring(0, 16)}|$disease|$confidence%';
-          history.insert(0, record);
-          await prefs.setStringList('scan_history', history);
-
-          setState(() {
-            _recentDisease = disease;
-            _recentConfidence = '$confidence%';
-          });
-
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Disease Detected: $disease'),
-              backgroundColor: Colors.green.shade700,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      print("Error: $e");
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  void _openHistory() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const HistoryScreen()));
   }
 
-  void _onItemTapped(int index) {
-    if (index == 1) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen()));
-    } else if (index == 2) {
-      _logout();
-    } else {
-      setState(() => _selectedIndex = index);
-    }
+  void _openTips() {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => const TipsScreen()));
+  }
+
+  void _openProfile() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ProfileScreen()))
+        .then((_) => _loadName());
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
-      appBar: AppBar(
-        backgroundColor: Colors.grey.shade50,
-        elevation: 0,
-        title: Row(
-          children: [
-            CircleAvatar(
-              backgroundColor: Colors.green.shade100,
-              child: Icon(Icons.person, color: Colors.green.shade700),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Hello, $_username!', style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
-                const Text("Let's keep your crops healthy!", style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
-            ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.notifications_none, color: Colors.grey.shade700),
-            onPressed: () {},
-          )
-        ],
-      ),
-      body: _isLoading 
-          ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(20.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Hero Green Card
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Colors.green.shade700, Colors.green.shade500],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(20),
-                    ),
+                  Expanded(
                     child: Row(
                       children: [
+                        IconButton(
+                          icon: const Icon(
+                            Icons.menu,
+                            color: AppColors.textDark,
+                          ),
+                          onPressed: _openProfile,
+                        ),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Detect Crop Diseases with AI', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 8),
-                              const Text('Upload a leaf image to get instant results & yield prediction.', style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 12)),
-                              const SizedBox(height: 16),
-                              ElevatedButton.icon(
-                                onPressed: _pickImage,
-                                icon: const Icon(Icons.upload_file, color: Colors.green.shade700),
-                                label: const Text('Upload Image', style: TextStyle(color: Colors.green.shade700)),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            _name.isEmpty ? 'Hello 👋' : 'Hello, $_name 👋',
+                            style: AppText.h2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Container(
-                          height: 80,
-                          width: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(Icons.eco, color: Colors.white, size: 40),
-                        )
                       ],
                     ),
                   ),
-                  const SizedBox(height: 30),
-
-                  // Quick Actions
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildQuickAction(Icons.camera_alt, 'Scan', _pickImage),
-                      _buildQuickAction(Icons.history, 'History', () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen()))),
-                      _buildQuickAction(Icons.tips_and_updates, 'Tips', () {}),
-                    ],
-                  ),
-                  const SizedBox(height: 30),
-
-                  // Recent Activity
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Recent Activity', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                      TextButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const HistoryScreen())),
-                        child: const Text('See all'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  
-                  // Recent Activity Card
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        )
-                      ]
+                  IconButton(
+                    icon: const Icon(
+                      Icons.notifications_none,
+                      color: AppColors.textDark,
                     ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: _recentDisease.contains('healthy') ? Colors.green.shade50 : Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            _recentDisease.contains('healthy') ? Icons.check_circle : Icons.warning,
-                            color: _recentDisease.contains('healthy') ? Colors.green : Colors.orange,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(_recentDisease, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                              const Text('Tap to view details', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                            ],
-                          ),
-                        ),
-                        if (_recentConfidence.isNotEmpty)
-                          Text(_recentConfidence, style: TextStyle(color: Colors.grey.shade600, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  )
+                    onPressed: () {},
+                  ),
                 ],
               ),
-            ),
+              const Padding(
+                padding: EdgeInsets.only(left: 48),
+                child: Text(
+                  "Let's keep your crops healthy!",
+                  style: AppText.body,
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryDark,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Detect Crop Diseases with AI',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Upload a leaf image to get instant results & yield prediction.',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(
+                        Icons.upload_file,
+                        color: AppColors.primary,
+                      ),
+                      label: const Text(
+                        'Upload Image',
+                        style: TextStyle(color: AppColors.primary),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              Row(
+                children: [
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.camera_alt_outlined,
+                      label: 'Scan',
+                      color: const Color(0xFFEAF3EE),
+                      onTap: _pickImage,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.history,
+                      label: 'History',
+                      color: const Color(0xFFEAF0F6),
+                      onTap: _openHistory,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _QuickAction(
+                      icon: Icons.lightbulb_outline,
+                      label: 'Tips',
+                      color: const Color(0xFFFBF3E1),
+                      onTap: _openTips,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Recent Activity', style: AppText.h2),
+                  TextButton(
+                    onPressed: _openHistory,
+                    child: const Text(
+                      'View All',
+                      style: TextStyle(color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              GestureDetector(
+                onTap: _openHistory,
+                child: const _ActivityTile(
+                  cropName: 'Tomato Leaf',
+                  disease: 'Early Blight',
+                  time: '2 hours ago',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: 0,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.green.shade700,
-        unselectedItemColor: Colors.grey,
+        currentIndex: _navIndex,
+        selectedItemColor: AppColors.primary,
+        unselectedItemColor: AppColors.textMuted,
+        type: BottomNavigationBarType.fixed,
+        onTap: (i) {
+          setState(() => _navIndex = i);
+          switch (i) {
+            case 1:
+              _openHistory();
+              break;
+            case 2:
+              _pickImage();
+              break;
+            case 3:
+              _openTips();
+              break;
+            case 4:
+              _openProfile();
+              break;
+          }
+        },
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home_outlined),
+            label: 'Home',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(
+            icon: CircleAvatar(
+              backgroundColor: AppColors.primary,
+              child: Icon(Icons.camera_alt, color: Colors.white, size: 18),
+            ),
+            label: 'Upload',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.lightbulb_outline),
+            label: 'Tips',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: 'Profile',
+          ),
         ],
       ),
     );
   }
+}
 
-  // Helper widget for Quick Actions
-  Widget _buildQuickAction(IconData icon, String label, Function() onTap) {
-    return GestureDetector(
+class _QuickAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickAction({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
       onTap: onTap,
-      child: Column(
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.primaryDark),
+            const SizedBox(height: 6),
+            Text(label, style: AppText.label, textAlign: TextAlign.center),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivityTile extends StatelessWidget {
+  final String cropName;
+  final String disease;
+  final String time;
+
+  const _ActivityTile({
+    required this.cropName,
+    required this.disease,
+    required this.time,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
         children: [
           Container(
-            padding: const EdgeInsets.all(16),
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(16),
+              color: const Color(0xFFEAF3EE),
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: Colors.green.shade700, size: 28),
+            child: const Icon(Icons.eco, color: AppColors.primary),
           ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(cropName, style: AppText.label),
+                const SizedBox(height: 2),
+                Text('$disease · $time', style: AppText.body),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right, color: AppColors.textMuted),
         ],
       ),
     );

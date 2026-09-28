@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../theme.dart';
+import '../utils/auth_store.dart';
 import 'register_screen.dart';
 import 'dashboard_screen.dart';
 
@@ -12,92 +13,166 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
-  final _passController = TextEditingController();
-  bool _isLoading = false;
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+  bool _rememberMe = true;
+  bool _loading = false;
 
-  Future<void> _loginUser() async {
-    setState(() => _isLoading = true);
-    final prefs = await SharedPreferences.getInstance();
-    
-    String? regEmail = prefs.getString('reg_email');
-    String? regPass = prefs.getString('reg_pass');
+  Future<void> _login() async {
+    setState(() => _loading = true);
+    final error = await AuthStore.login(
+      _emailController.text,
+      _passwordController.text,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
 
-    await Future.delayed(const Duration(seconds: 1)); // Simulate network delay
-    setState(() => _isLoading = false);
-
-    if (regEmail == null || regPass == null) {
+    if (error != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No account found. Please register first.'), backgroundColor: Colors.red),
+        SnackBar(content: Text(error), backgroundColor: AppColors.danger),
       );
-    } else if (_emailController.text == regEmail && _passController.text == regPass) {
-      await prefs.setString('user_email', regEmail); // Set login session
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardScreen()));
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid email or password'), backgroundColor: Colors.red),
-      );
+      return;
     }
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const DashboardScreen()),
+      (route) => false,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.green.shade800, Colors.green.shade100],
-          ),
-        ),
-        child: Center(
-          child: SingleChildScrollView(
-            child: Padding(
-              padding: const EdgeInsets.all(32.0),
-              child: Card(
-                elevation: 8,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                child: Padding(
-                  padding: const EdgeInsets.all(24.0),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.eco, size: 60, color: Colors.green),
-                      const SizedBox(height: 8),
-                      const Text('Smart Crop AI', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.green)),
-                      const Text('Healthy Crops for a Sustainable Future', style: TextStyle(color: Colors.grey)),
-                      const SizedBox(height: 24),
-                      TextField(
-                        controller: _emailController,
-                        decoration: const InputDecoration(labelText: 'Email', prefixIcon: Icon(Icons.email), border: OutlineInputBorder()),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _passController,
-                        obscureText: true,
-                        decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock), border: OutlineInputBorder()),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: _isLoading 
-                          ? const Center(child: CircularProgressIndicator())
-                          : ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.green.shade700, foregroundColor: Colors.white),
-                              onPressed: _loginUser,
-                              child: const Text('LOGIN', style: TextStyle(fontSize: 16)),
-                            ),
-                      ),
-                      TextButton(
-                        onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                        child: const Text('Don\'t have an account? Sign up'),
-                      ),
-                    ],
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 24),
+              Center(
+                child: Column(
+                  children: [
+                    const Icon(Icons.eco, color: AppColors.primary, size: 40),
+                    const SizedBox(height: 8),
+                    Text(
+                      'CropGuard',
+                      style: AppText.h1.copyWith(color: AppColors.primary),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Smart Detection for Healthier Crops',
+                      style: AppText.body,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 36),
+              Text('Login', style: AppText.h2),
+              const SizedBox(height: 4),
+              const Text(
+                'Welcome back! Please login to continue.',
+                style: AppText.body,
+              ),
+              const SizedBox(height: 24),
+              const Text('Email Address', style: AppText.label),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: appInputDecoration(
+                  'Enter your email',
+                  Icons.mail_outline,
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text('Password', style: AppText.label),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _passwordController,
+                obscureText: _obscurePassword,
+                decoration: appInputDecoration(
+                  'Enter your password',
+                  Icons.lock_outline,
+                  suffix: IconButton(
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                      color: AppColors.textMuted,
+                      size: 20,
+                    ),
+                    onPressed: () =>
+                        setState(() => _obscurePassword = !_obscurePassword),
                   ),
                 ),
               ),
-            ),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _rememberMe,
+                        activeColor: AppColors.primary,
+                        onChanged: (v) =>
+                            setState(() => _rememberMe = v ?? false),
+                      ),
+                      const Text('Remember me', style: AppText.body),
+                    ],
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Password reset isn\'t wired up yet.'),
+                        ),
+                      );
+                    },
+                    child: const Text(
+                      'Forget password?',
+                      style: TextStyle(color: AppColors.primary),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: _loading ? null : _login,
+                style: primaryButtonStyle(),
+                child: _loading
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text('Login'),
+              ),
+              const SizedBox(height: 24),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Don't have an account? ", style: AppText.body),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+                    ),
+                    child: const Text(
+                      'Sign Up',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
           ),
         ),
       ),
