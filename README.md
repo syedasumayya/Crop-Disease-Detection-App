@@ -20,7 +20,7 @@ Add screenshots here once you have them, for example:
 - **AI disease detection** — photo in, disease name and confidence out
 - **Symptoms and recommended actions** for each detected condition
 - **PDF report download** with the photo, diagnosis, symptoms, and actions
-- **Sign up / log in** with input validation (local, see [Limitations](#-current-limitations))
+- **Sign up / log in** with input validation
 - **Dashboard** with quick actions and recent activity
 - **Scan history** with search and Healthy / Diseased filters
 - **Crop care tips** guide
